@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpeedWurdz - Multiplayer Word Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>SpeedWurdz</h1>
+            <p>Multiplayer Word Game</p>
+        </header>
+
+        <!-- Username Setup Screen -->
+        <div id="username-screen" class="screen active">
+            <div class="card">
+                <h2>Welcome to SpeedWurdz!</h2>
+                <p>Enter your username to join the lobby</p>
+                <div class="input-group">
+                    <input type="text" id="username-input" placeholder="Your username" maxlength="20">
+                    <button id="join-lobby-btn">Join Lobby</button>
+                </div>
+                <div id="username-error" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- Lobby Screen -->
+        <div id="lobby-screen" class="screen">
+            <div class="lobby-header">
+                <h2>Game Lobby</h2>
+                <div class="user-info">
+                    <span>Welcome, <strong id="current-username"></strong>!</span>
+                    <button id="leave-lobby-btn" class="btn-secondary">Leave Lobby</button>
+                </div>
+            </div>
+
+            <div class="lobby-content">
+                <!-- Active Users Panel -->
+                <div class="panel">
+                    <h3>Active Users (<span id="user-count">0</span>)</h3>
+                    <div id="users-list" class="users-list">
+                        <!-- Users will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Game Tables Panel -->
+                <div class="panel tables-panel">
+                    <div class="panel-header">
+                        <h3>Game Tables (<span id="table-count">0</span>)</h3>
+                        <button id="create-table-btn" class="btn-primary">Create New Table</button>
+                    </div>
+                    <div id="tables-list" class="tables-list">
+                        <!-- Tables will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Table Modal -->
+        <div id="create-table-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Create New Table</h3>
+                    <button id="close-modal-btn" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group">
+                        <label for="table-name">Table Name:</label>
+                        <input type="text" id="table-name" placeholder="Enter table name" maxlength="30">
+                    </div>
+                    <div class="input-group">
+                        <label for="max-players">Max Players:</label>
+                        <select id="max-players">
+                            <option value="2">2 Players</option>
+                            <option value="3">3 Players</option>
+                            <option value="4" selected>4 Players</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="starting-tiles">Starting Tiles in Pool:</label>
+                        <input type="number" id="starting-tiles" min="75" max="500" step="5" value="100">
+                        <small class="help-text">Recommended: 25 tiles per player (minimum 75)</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="cancel-create-btn" class="btn-secondary">Cancel</button>
+                    <button id="confirm-create-btn" class="btn-primary">Create Table</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Table Screen -->
+        <div id="table-screen" class="screen">
+            <div class="table-header">
+                <h2 id="table-title">Game Table</h2>
+                <div class="table-actions">
+                    <button id="leave-table-btn" class="btn-secondary">Leave Table</button>
+                    <button id="start-game-btn" class="btn-primary" style="display: none;">Start Game</button>
+                </div>
+            </div>
+
+            <div class="table-content">
+                <div class="players-panel">
+                    <h3>Players (<span id="players-count">0</span>/<span id="max-players-display">4</span>)</h3>
+                    <div id="players-list" class="players-list">
+                        <!-- Players will be populated here -->
+                    </div>
+                </div>
+
+                <div class="game-info">
+                    <p>Waiting for players to join...</p>
+                    <p>Game will start when all players are ready.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Play Screen -->
+        <div id="game-screen" class="screen">
+            <!-- Game Countdown Overlay -->
+            <div id="countdown-overlay" class="countdown-overlay" style="display: none;">
+                <div class="countdown-container">
+                    <h2>Game Starting Soon!</h2>
+                    <div id="countdown-timer" class="countdown-timer">5</div>
+                    <p>Get ready to play SpeedWurdz!</p>
+                </div>
+            </div>
+
+            <!-- Waiting for Host Overlay -->
+            <div id="waiting-overlay" class="waiting-overlay" style="display: none;">
+                <div class="waiting-container">
+                    <h2>Ready to Start</h2>
+                    <p>All players are in the game</p>
+                    <button id="start-gameplay-btn" class="btn-primary">Start Game</button>
+                    <button id="waiting-for-host-btn" class="btn-secondary" disabled style="display: none;">Waiting for Host</button>
+                </div>
+            </div>
+
+            <div class="game-header">
+                <div class="game-info-bar">
+                    <h3 id="game-table-name">Game</h3>
+                    <div class="game-stats">
+                        <span>Time: <span id="game-timer">00:00</span></span>
+                        <span><span id="remaining-tiles-count">100</span> tiles remain in bag</span>
+                    </div>
+                </div>
+                <div class="game-controls">
+                    <button id="sound-toggle-btn" class="btn-secondary btn-small" title="Toggle sounds">🔊</button>
+                    <button id="resign-game-btn" class="btn-danger">Resign</button>
+                </div>
+            </div>
+
+            <div class="game-content">
+                <!-- Personal Board Section -->
+                <div class="board-section">
+                    <div class="board-header">
+                        <h4>Your Board - Tiles: <span id="board-tile-count">0</span> <button id="refresh-board-btn" class="refresh-btn" title="Refresh board from server">🔄</button></h4>
+                        <div class="board-controls">
+                            <div class="board-coordinates">
+                                Position: (<span id="view-x">0</span>, <span id="view-y">0</span>)
+                            </div>
+                            <button id="submit-board-btn" class="btn-primary submit-btn">Submit</button>
+                        </div>
+                    </div>
+                    
+                    <div class="board-container">
+                        <!-- Navigation Arrows -->
+                        <button class="board-arrow arrow-up" id="scroll-up">↑</button>
+                        <button class="board-arrow arrow-down" id="scroll-down">↓</button>
+                        <button class="board-arrow arrow-left" id="scroll-left">←</button>
+                        <button class="board-arrow arrow-right" id="scroll-right">→</button>
+                        
+                        <!-- The Game Board Grid -->
+                        <div id="game-board" class="game-board">
+                            <!-- Grid tiles will be generated here -->
+                        </div>
+
+                        <!-- Direction Arrows for Type Mode -->
+                        <div id="direction-arrows" class="direction-arrows" style="display: none;">
+                            <button class="dir-arrow dir-down" data-direction="down">↓</button>
+                            <button class="dir-arrow dir-right" data-direction="right">→</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Player Hand Section -->
+                <div class="hand-section">
+                    <div class="hand-header">
+                        <h4>Your Tiles (<span id="hand-count">0</span>) <button id="refresh-hand-btn" class="refresh-btn" title="Refresh hand from server">🔄</button></h4>
+                        <div class="hand-actions">
+                            <button id="trash-tile-btn" class="btn-warning btn-small trash-target">🎯 Drag here to trash</button>
+                        </div>
+                    </div>
+                    
+                    <div id="player-hand" class="player-hand">
+                        <!-- Player tiles will be displayed here -->
+                        <div class="empty-hand">
+                            <p>No tiles yet</p>
+                            <p class="hint">Tiles will appear here when the game provides them</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div id="game-over-modal" class="modal" style="display: none;">
+            <div class="modal-content game-over-content">
+                <h2 id="game-over-title">🎉 Game Over! 🎉</h2>
+                <div id="game-over-message" class="game-over-message"></div>
+                
+                <div class="stats-container">
+                    <h3>Final Statistics</h3>
+                    <div id="player-stats" class="player-stats"></div>
+                </div>
+                
+                <div class="game-over-actions">
+                    <button id="return-to-lobby-btn" class="btn-primary">Return to Lobby</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="status-message" class="status-message"></div>
+    </div>
+
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="sounds.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
