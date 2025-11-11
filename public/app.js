@@ -747,8 +747,8 @@ function updateTableView(table) {
     playersCount.textContent = table.players.length;
     maxPlayersDisplay.textContent = table.maxPlayers;
     
-    // Show/hide start game button for host
-    if (isHost && table.players.length >= 2) {
+    // Show/hide start game button for host (allow single player games)
+    if (isHost && table.players.length >= 1) {
         startGameBtn.style.display = 'block';
     } else {
         startGameBtn.style.display = 'none';
@@ -872,6 +872,7 @@ function generateBoardGrid() {
                 tile.addEventListener('contextmenu', (e) => handleTileRightClick(e, actualX, actualY));
                 tile.addEventListener('dragstart', (e) => handleBoardTileDragStart(e, actualX, actualY));
                 tile.addEventListener('dragend', handleBoardTileDragEnd);
+                tile.addEventListener('dblclick', (e) => handleTileDoubleClick(e, actualX, actualY));
             } else {
                 // Mark the start tile (0,0)
                 if (actualX === 0 && actualY === 0) {
@@ -1213,6 +1214,39 @@ function handleHandDrop(e) {
 
 function handleHandDragLeave(e) {
     e.target.classList.remove('drag-over-hand');
+}
+
+function handleTileDoubleClick(e, x, y) {
+    e.preventDefault();
+    
+    // Find the tile at this position
+    const coordKey = `${x},${y}`;
+    const tileData = placedTiles.get(coordKey);
+    
+    if (!tileData) {
+        return; // No tile at this position
+    }
+    
+    // Play drop sound (same as drag to hand)
+    gameSounds.playTileDrop();
+    
+    // Remove tile from board locally
+    placedTiles.delete(coordKey);
+    
+    // Notify server about tile return (same code path as drag to hand)
+    socket.emit('game-action', {
+        tableId: currentTable.id,
+        action: 'return-tile-to-hand',
+        tileId: tileData.id,
+        x: x,
+        y: y
+    });
+    
+    // Update displays
+    updateBoardView();
+    // Hand will be updated when server responds with game state
+    
+    showStatusMessage(`Returned ${tileData.letter} to hand`, 'success');
 }
 
 function resignGame() {
