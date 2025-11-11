@@ -1,22 +1,25 @@
-# SpeedWurdz - Multiplayer Word Game
+# SpeedWurdz 🎯
 
-A real-time multiplayer word game similar to Bananagrams, built with Node.js, Express, and Socket.io.
+A fast-paced multiplayer word game similar to Bananagrams, built with Node.js and Socket.io.
 
-## Features
+## 🚀 Live Demo
+[Coming Soon - Alpha Testing]
 
-### 🎮 Current Features (Lobby System)
-- **User Management**: Set username and join the game lobby
-- **Active Users**: See all currently online players
-- **Table Management**: Create and join game tables
-- **Real-time Updates**: Live updates for user presence and table status
-- **Responsive Design**: Works on desktop and mobile devices
+## 🎮 How to Play
+1. Join a lobby with your username
+2. Create or join a game table (2-6 players)
+3. When the game starts, use your letter tiles to build connected words
+4. First player to use all their tiles wins!
+5. Points awarded based on Scrabble tile values + length bonuses
 
-### 🚀 Upcoming Features
-- Tile-based word game mechanics
-- Real-time gameplay with letter tiles
-- Score tracking and game statistics
-- Game rooms with up to 4 players
-- Tournament mode
+## ✨ Features
+- **Real-time multiplayer** - Up to 6 players per game
+- **Spell checking** - 172,820 word dictionary validation  
+- **Scoring system** - Scrabble-based points with bonuses
+- **Sound effects** - Complete audio experience with toggle
+- **Mobile responsive** - Play on any device
+- **Drag & drop** - Intuitive tile placement
+- **Private boards** - Each player has their own word grid
 
 ## Quick Start
 
