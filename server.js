@@ -14,6 +14,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Store active users and tables
 const activeUsers = new Map(); // userId -> {username, socketId}
 const gameTables = new Map();  // tableId -> {id, name, host, players, maxPlayers, status}
+const gameRecords = []; // Store completed games history
 
 // Game tile system - 3 of each letter A-Z (78 total tiles)
 const TILE_LETTERS = [
@@ -278,7 +279,7 @@ io.on('connection', (socket) => {
         socket.emit('lobby-joined', {
             username: username,
             users: Array.from(activeUsers.values()).map(user => user.username),
-            tables: Array.from(gameTables.values())
+            tables: getSortedTables()
         });
 
         // Notify other users in lobby
@@ -307,7 +308,7 @@ io.on('connection', (socket) => {
             maxPlayers: tableData.maxPlayers || 4,
             startingTiles: tableData.startingTiles || Math.max(75, (tableData.maxPlayers || 4) * 25),
             status: 'waiting',
-            created: new Date()
+            createdAt: new Date()
         };
 
         gameTables.set(tableId, newTable);
@@ -316,10 +317,7 @@ io.on('connection', (socket) => {
         socket.join(`table-${tableId}`);
 
         // Notify lobby of new table
-        io.to('lobby').emit('table-created', {
-            table: newTable,
-            tables: Array.from(gameTables.values())
-        });
+        broadcastTablesUpdate();
 
         // Send confirmation to creator
         socket.emit('table-joined', newTable);
@@ -370,10 +368,7 @@ io.on('connection', (socket) => {
         });
 
         // Update lobby with table changes
-        io.to('lobby').emit('table-updated', {
-            table: table,
-            tables: Array.from(gameTables.values())
-        });
+        broadcastTablesUpdate();
 
         // Send confirmation to joiner
         socket.emit('table-joined', table);
@@ -397,10 +392,7 @@ io.on('connection', (socket) => {
         if (table.players.length === 0) {
             // Delete empty table
             gameTables.delete(tableId);
-            io.to('lobby').emit('table-deleted', {
-                tableId: tableId,
-                tables: Array.from(gameTables.values())
-            });
+            broadcastTablesUpdate();
         } else {
             // If host left, assign new host
             if (table.host === user.username && table.players.length > 0) {
@@ -824,6 +816,8 @@ function checkTilesConnected(boardData) {
         positionToTile.set(posKey, tile);
     });
     
+    console.log('DEBUG: Tile positions for connectivity check:', Array.from(tilePositions));
+    
     // Start BFS from the first tile
     const startPos = `${boardData[0].col},${boardData[0].row}`;
     const visited = new Set();
@@ -1040,6 +1034,9 @@ function handleBoardSubmission(socket, user, table, data) {
     }
     
     console.log(`${user.username} submitting ${data.boardData.length} tiles for validation`);
+    console.log('DEBUG: Received boardData:', data.boardData.map(tile => 
+        `${tile.letter} at col:${tile.col},row:${tile.row}`
+    ));
     
     // Check if all tiles are connected
     const isConnected = checkTilesConnected(data.boardData);
@@ -1206,6 +1203,20 @@ function handleGameOver(table, gameState, winnerUsername) {
         };
     });
     
+    // Store game record for history
+    const gameRecord = {
+        id: table.id,
+        tableName: table.name,
+        startTime: gameState.startTime,
+        endTime: new Date(),
+        winner: winnerUsername,
+        playerResults: finalStats,
+        totalPlayers: gameState.players.length,
+        gamemode: 'standard'
+    };
+    gameRecords.push(gameRecord);
+    console.log(`Game record stored: ${table.name} - Winner: ${winnerUsername}`);
+    
     // Notify all players of game over
     io.to(`table-${table.id}`).emit('game-over', {
         winner: winnerUsername,
@@ -1217,6 +1228,86 @@ function handleGameOver(table, gameState, winnerUsername) {
         winner: winnerUsername,
         playerStats: finalStats
     });
+    
+    // Clean up the table after a delay to allow players to see results
+    setTimeout(() => {
+        cleanupCompletedGame(table.id);
+    }, 60000); // 1 minute delay
+}
+
+// Clean up completed games
+function cleanupCompletedGame(tableId) {
+    const table = gameTables.get(tableId);
+    if (!table) return;
+    
+    console.log(`Cleaning up completed game: ${table.name} (ID: ${tableId})`);
+    
+    // Remove all players from the table's socket room
+    if (table.gameState && table.gameState.players) {
+        table.gameState.players.forEach(player => {
+            // Find the player's socket and make them leave the room
+            const playerSocket = Array.from(activeUsers.entries())
+                .find(([socketId, userData]) => userData.username === player.username);
+            
+            if (playerSocket) {
+                const socketId = playerSocket[0];
+                const socket = io.sockets.sockets.get(socketId);
+                if (socket) {
+                    socket.leave(`table-${tableId}`);
+                }
+            }
+        });
+    }
+    
+    // Remove the table from active tables
+    gameTables.delete(tableId);
+    
+    // Broadcast updated tables list to all users in lobby
+    broadcastTablesUpdate();
+    
+    console.log(`Game cleanup complete for table ${tableId}`);
+}
+
+// Get sorted and filtered tables for lobby display
+function getSortedTables() {
+    const tables = Array.from(gameTables.values());
+    
+    // Filter out finished games (should be cleaned up, but just in case)
+    const activeTables = tables.filter(table => table.status !== 'finished');
+    
+    // Sort tables: waiting games first, then playing games, then full games
+    return activeTables.sort((a, b) => {
+        // Priority order: waiting > playing > full
+        const getPriority = (table) => {
+            if (table.status === 'waiting' && table.players.length < table.maxPlayers) return 0; // Highest priority
+            if (table.status === 'playing') return 1; // Medium priority  
+            if (table.players.length >= table.maxPlayers) return 2; // Lower priority
+            return 3; // Lowest priority (other states)
+        };
+        
+        const priorityA = getPriority(a);
+        const priorityB = getPriority(b);
+        
+        if (priorityA !== priorityB) {
+            return priorityA - priorityB; // Sort by priority first
+        }
+        
+        // Within same priority, sort by creation time (newest first for waiting, oldest first for others)
+        if (priorityA === 0) { // Waiting games - newest first
+            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        } else { // Playing/full games - oldest first
+            return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+        }
+    });
+}
+
+// Broadcast updated tables list to all lobby users
+function broadcastTablesUpdate() {
+    const sortedTables = getSortedTables();
+    io.to('lobby').emit('tables-updated', {
+        tables: sortedTables
+    });
+    console.log(`Broadcasting ${sortedTables.length} active tables to lobby`);
 }
 
 // Handle tile placement on board

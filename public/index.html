@@ -11,7 +11,7 @@
         <!-- Header -->
         <header class="header">
             <h1>SpeedWurdz</h1>
-            <p>Multiplayer Word Game</p>
+            <button id="instructions-btn" class="btn-instructions">Instructions</button>
         </header>
 
         <!-- Username Setup Screen -->
@@ -218,6 +218,59 @@
                 
                 <div class="game-over-actions">
                     <button id="return-to-lobby-btn" class="btn-primary">Return to Lobby</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions Modal -->
+        <div id="instructions-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>How to Play SpeedWurdz</h2>
+                    <button class="modal-close" id="instructions-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <h3>Starting a Game</h3>
+                    <p>Click "Create New Table" to host a game, or "Join Table" to join a game that has not started. Once all players have joined, the host can click "Start Game" to begin.</p>
+                    
+                    <h3>Playing the Game</h3>
+                    <p><strong>Objective:</strong> Use all your letter tiles to create connected words on your private board. The first player to use all their tiles wins!</p>
+                    
+                    <p><strong>Placing Tiles:</strong></p>
+                    <ul>
+                        <li><strong>Desktop:</strong> Drag tiles from your hand to the board, or click a hand tile then click where to place it. After placing a tile you can select the small green arrows to choose a typing direction and type the next letter to add to your word.</li>
+                        <li><strong>Mobile:</strong> Tap a hand tile to select it, then tap an empty board space to place it</li>
+                        <li><strong>Moving Tiles:</strong> Drag placed tiles to new positions, or double-click to return to hand</li>
+                        <li><strong>Board-to-Board:</strong> Tap a placed tile, then tap an empty space to move it</li>
+                    </ul>
+                    
+                    <p><strong>Word Building:</strong></p>
+                    <ul>
+                        <li>All tiles must be connected (touching horizontally or vertically)</li>
+                        <li>Words are formed horizontally (left-to-right) and vertically (top-to-bottom)</li>
+                        <li>All words must be valid dictionary words</li>
+                        <li>Use arrow keys or direction arrows to scroll around the board</li>
+                    </ul>
+                    
+                    <p><strong>Submitting:</strong> When you've used all your tiles and they form valid connected words, click "Submit Board". All players will recive 1 new tile until all tiles are removed from the bag.</p>
+                    
+                    <h3>Scoring</h3>
+                    <p><strong>Tile Values:</strong> Each letter has a point value based on Scrabble scoring (A=1, Q=10, etc.)</p>
+                    
+                    <p><strong>Length Bonuses:</strong></p>
+                    <ul>
+                        <li>5-letter words: +5 bonus points</li>
+                        <li>6-letter words: +10 bonus points</li>
+                        <li>7+ letter words: +15 bonus points</li>
+                    </ul>
+                    
+                    <p><strong>Game Over:</strong> When a player successfully submits their board after all tiles are removed from the bag, final scores are calculated and displayed. Points are awarded for all valid words created.</p>
+                    
+                    <h3>Important Tips!</h3>
+                    <ol>
+                        <li>If you have a letter you can't play, drag it to the trash. It will be returned to the bag and you will be given 3 new tiles.</li>
+                        <li>You may completely reorganize your board at any time. Break apart words, return tiles to your hand, and shift words around.</li>
+                    </ol>
                 </div>
             </div>
         </div>

@@ -61,6 +61,9 @@ const scrollRightBtn = document.getElementById('scroll-right');
 const refreshHandBtn = document.getElementById('refresh-hand-btn');
 const refreshBoardBtn = document.getElementById('refresh-board-btn');
 const soundToggleBtn = document.getElementById('sound-toggle-btn');
+const instructionsBtn = document.getElementById('instructions-btn');
+const instructionsModal = document.getElementById('instructions-modal');
+const instructionsCloseBtn = document.getElementById('instructions-close');
 
 // Tile placement elements
 const submitBoardBtn = document.getElementById('submit-board-btn');
@@ -76,6 +79,7 @@ let viewPosition = { x: 0, y: 0 };
 let gameStartTime = null;
 let gameTimerInterval = null;
 let selectedHandTile = null;
+let selectedBoardTile = null; // {x, y, tileData} for board tile selection
 let typingPosition = null;
 let typingDirection = null;
 let placedTiles = new Map(); // Map of "x,y" -> tileData for tiles placed on board
@@ -107,6 +111,10 @@ refreshHandBtn?.addEventListener('click', () => refreshHand());
 refreshBoardBtn?.addEventListener('click', () => refreshBoard());
 startGameplayBtn.addEventListener('click', startGameplay);
 
+// Instructions modal listeners
+instructionsBtn?.addEventListener('click', showInstructionsModal);
+instructionsCloseBtn?.addEventListener('click', hideInstructionsModal);
+
 // Tile placement event listeners
 submitBoardBtn.addEventListener('click', submitBoard);
 
@@ -135,6 +143,13 @@ document.addEventListener('click', () => {
 createTableModal.addEventListener('click', (e) => {
     if (e.target === createTableModal) {
         hideCreateTableModal();
+    }
+});
+
+// Instructions modal backdrop click
+instructionsModal?.addEventListener('click', (e) => {
+    if (e.target === instructionsModal) {
+        hideInstructionsModal();
     }
 });
 
@@ -188,6 +203,10 @@ socket.on('table-updated', (data) => {
 });
 
 socket.on('table-deleted', (data) => {
+    updateTablesList(data.tables);
+});
+
+socket.on('tables-updated', (data) => {
     updateTablesList(data.tables);
 });
 
@@ -607,6 +626,16 @@ function hideCreateTableModal() {
     updateStartingTilesDefault(); // Reset to default
 }
 
+function showInstructionsModal() {
+    instructionsModal.classList.add('active');
+    instructionsModal.style.display = 'flex'; // Explicitly show modal
+}
+
+function hideInstructionsModal() {
+    instructionsModal.classList.remove('active');
+    instructionsModal.style.display = 'none'; // Explicitly hide modal
+}
+
 function updateStartingTilesDefault() {
     const maxPlayers = parseInt(maxPlayersSelect.value);
     const defaultTiles = Math.max(75, maxPlayers * 25);
@@ -721,7 +750,7 @@ function updateTablesList(tables) {
                 <div class="table-details">
                     <h4>${table.name}</h4>
                     <div class="table-meta">
-                        Host: ${table.host} • Created: ${new Date(table.created).toLocaleTimeString()}
+                        Host: ${table.host} • Created: ${new Date(table.createdAt).toLocaleTimeString()}
                     </div>
                 </div>
                 <div class="table-status">
@@ -873,6 +902,7 @@ function generateBoardGrid() {
                 tile.addEventListener('dragstart', (e) => handleBoardTileDragStart(e, actualX, actualY));
                 tile.addEventListener('dragend', handleBoardTileDragEnd);
                 tile.addEventListener('dblclick', (e) => handleTileDoubleClick(e, actualX, actualY));
+                tile.addEventListener('click', (e) => handleBoardTileClick(e, actualX, actualY));
             } else {
                 // Mark the start tile (0,0)
                 if (actualX === 0 && actualY === 0) {
@@ -973,6 +1003,7 @@ function syncBoardDisplay() {
     console.log('currentPlayer.board.tiles:', currentPlayer?.board?.tiles);
     
     // Clear current board state
+    console.log(`DEBUG: Clearing placedTiles (was ${placedTiles.size} tiles)`);
     placedTiles.clear();
     
     // Determine which tile source to use
@@ -1021,6 +1052,7 @@ function syncBoardDisplay() {
             myTilesCount++;
             const coordKey = `${tile.position.x},${tile.position.y}`;
             console.log(`Adding my tile ${tile.id}(${tile.letter}) at ${coordKey}`);
+            console.log(`DEBUG: Setting placedTiles[${coordKey}] = ${tile.letter}`);
             placedTiles.set(coordKey, {
                 id: tile.id,
                 letter: tile.letter,
@@ -1340,7 +1372,8 @@ function handleTileClick(index) {
 }
 
 function selectTile(index) {
-    // Exit any current typing mode
+    // Immediately fade direction arrows and exit typing mode
+    hideDirectionArrows();
     exitTypingMode();
     
     // Remove previous selection
@@ -1360,17 +1393,29 @@ function selectTile(index) {
 }
 
 function handleGridTileClick(e, x, y) {
+    // Immediately fade direction arrows when tapping anywhere
+    hideDirectionArrows();
+    exitTypingMode();
+    
+    const coordKey = `${x},${y}`;
+    
+    // Check if there's already a tile at this position
+    if (placedTiles.has(coordKey)) {
+        return; // Don't place on occupied spaces
+    }
+    
     if (selectedHandTile !== null) {
-        // Place tile and show direction arrows
+        // Place tile from hand
         const currentPlayer = getCurrentPlayer();
         const tile = currentPlayer?.hand[selectedHandTile];
         
         if (tile) {
-            console.log(`Click-placing tile ${tile.id} (${tile.letter}) at ${x},${y}`);
+            console.log(`Click-placing tile from hand: ${tile.id} (${tile.letter}) at ${x},${y}`);
             
             // Place the tile locally for immediate visual feedback
-            const coordKey = `${x},${y}`;
+            console.log(`DEBUG: 2-click placing tile ${tile.letter} at ${coordKey}`);
             placedTiles.set(coordKey, { ...tile, fromHand: true, temporary: true });
+            console.log(`DEBUG: placedTiles.size after 2-click placement: ${placedTiles.size}`);
             
             // Remove from hand locally (server will update authoritative state)
             currentPlayer.hand.splice(selectedHandTile, 1);
@@ -1394,6 +1439,37 @@ function handleGridTileClick(e, x, y) {
             syncHandDisplay();
             clearSelection();
         }
+    } else if (selectedBoardTile !== null) {
+        // Move tile from board to new position
+        console.log(`Click-moving tile from board: ${selectedBoardTile.tileData.letter} from ${selectedBoardTile.x},${selectedBoardTile.y} to ${x},${y}`);
+        
+        // Remove tile from old position locally
+        const oldCoordKey = `${selectedBoardTile.x},${selectedBoardTile.y}`;
+        placedTiles.delete(oldCoordKey);
+        
+        // Place tile at new position locally
+        placedTiles.set(coordKey, { ...selectedBoardTile.tileData });
+        
+        // Notify server about tile movement
+        socket.emit('game-action', {
+            tableId: currentTable.id,
+            action: 'move-tile-on-board',
+            tileId: selectedBoardTile.tileData.id,
+            fromX: selectedBoardTile.x,
+            fromY: selectedBoardTile.y,
+            toX: x,
+            toY: y
+        });
+        
+        // Show direction arrows at new position
+        showDirectionArrows(x, y);
+        typingPosition = { x, y };
+        
+        // Update displays
+        updateBoardView();
+        clearSelection();
+        
+        showStatusMessage(`Moved ${selectedBoardTile.tileData.letter} to new position`, 'success');
     }
 }
 
@@ -1753,7 +1829,9 @@ function handleTileDrop(e, x, y) {
         // Check if position is empty
         if (!placedTiles.has(coordKey)) {
             // Place the tile locally for immediate visual feedback
+            console.log(`DEBUG: Drag-drop placing tile ${tile.letter} at ${coordKey}`);
             placedTiles.set(coordKey, { ...tile, fromHand: true, temporary: true });
+            console.log(`DEBUG: placedTiles.size after drag-drop placement: ${placedTiles.size}`);
             console.log(`Placed tile ${tile.id}(${tile.letter}) at ${coordKey}, placedTiles.size = ${placedTiles.size}`);
             
             // Notify server about tile movement (all movements go through server now)
@@ -1801,6 +1879,28 @@ function handleTileDrop(e, x, y) {
     }
 }
 
+function handleBoardTileClick(e, x, y) {
+    e.preventDefault();
+    
+    // Immediately fade direction arrows when tapping any tile
+    hideDirectionArrows();
+    exitTypingMode();
+    
+    const coordKey = `${x},${y}`;
+    const tileData = placedTiles.get(coordKey);
+    
+    if (!tileData) return;
+    
+    // Clear any existing selection first
+    clearSelection();
+    
+    // Select this board tile
+    selectedBoardTile = { x, y, tileData };
+    e.target.classList.add('selected');
+    
+    showStatusMessage(`Selected ${tileData.letter} tile. Tap empty space to move it there.`, 'info');
+}
+
 function handleTileRightClick(e, x, y) {
     e.preventDefault();
     
@@ -1842,7 +1942,8 @@ function handleTileRightClick(e, x, y) {
 
 function clearSelection() {
     selectedHandTile = null;
-    document.querySelectorAll('.tile.selected').forEach(tile => {
+    selectedBoardTile = null;
+    document.querySelectorAll('.tile.selected, .grid-tile.selected').forEach(tile => {
         tile.classList.remove('selected');
     });
     // trashTileBtn.disabled = true; // Keep enabled for drag & drop functionality
@@ -1888,6 +1989,10 @@ function submitBoard() {
     }
     
     console.log('Submitting board with tiles:', boardData);
+    console.log('DEBUG: placedTiles map contents:');
+    placedTiles.forEach((tile, coordKey) => {
+        console.log(`  ${coordKey}: ${tile.letter} (id: ${tile.id})`);
+    });
     
     // Send submission to server
     socket.emit('game-action', {
